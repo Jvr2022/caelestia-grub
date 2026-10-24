@@ -25,6 +25,12 @@ sudo apt update
 sudo apt install build-essential bison flex pkg-config libfreetype6-dev gettext curl efibootmgr grub-common patch xz-utils
 ```
 
+RHEL / Fedora
+
+```sh
+sudo apt install build-essential bison flex pkg-config libfreetype6-dev gettext curl efibootmgr grub2-common patch xz
+```
+
 For encrypted `/boot`, also install `cryptsetup` and `jq`.
 
 With Secure Boot enabled, also install:
@@ -35,6 +41,9 @@ sudo pacman -S --needed sbctl sbsigntools openssl jq
 
 # Debian / Ubuntu
 sudo apt install sbsigntool openssl jq
+
+# RHEL / Fedora
+sudo dnf install sbsigntools openssl jq
 ```
 
 On Debian / Ubuntu, also install `sbctl` using its [upstream instructions](https://github.com/Foxboron/sbctl#installation).
