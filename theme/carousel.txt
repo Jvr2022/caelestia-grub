@@ -1,0 +1,68 @@
+# Requires the bundled Caelestia GRUB extension and caelestia_carousel=1.
+title-text: ""
+desktop-image: "background.png"
+desktop-image-scale-method: "crop"
+desktop-color: "#171322"
+terminal-font: "Caelestia Mono Regular 20"
+message-font: "Caelestia Regular 20"
+message-color: "#f2eafa"
+message-bg-color: "#171322"
+terminal-left: "8%"
+terminal-top: "20%"
+terminal-width: "84%"
+terminal-height: "66%"
+
++ label {
+  id = "caelestia-heading"
+  left = 8%
+  top = 22%
+  width = 84%
+  height = 8%
+  text = "Where to next?"
+  align = "center"
+  font = "Caelestia Regular 32"
+  color = "#f2eafa"
+}
++ boot_menu {
+  id = "caelestia-carousel"
+  left = 7%
+  top = 31%
+  width = 86%
+  height = 48%
+  item_font = "Caelestia Regular 20"
+  selected_item_font = "Caelestia Regular 24"
+  item_color = "#c7bdd4"
+  selected_item_color = "#f2eafa"
+  icon_width = 384
+  icon_height = 384
+  scrollbar = false
+}
++ image {
+  id = "caelestia-controls"
+  left = 50%-320
+  top = 83%
+  width = 640
+  height = 40
+  file = "controls.png"
+}
++ label {
+  id = "__timeout__"
+  left = 10%
+  top = 89%
+  width = 80%
+  height = 4%
+  align = "center"
+  text = "Starting in %d seconds"
+  font = "Caelestia Regular 16"
+  color = "#c7bdd4"
+}
++ progress_bar {
+  id = "__timeout__"
+  left = 42%
+  top = 94%
+  width = 16%
+  height = 6
+  show_text = false
+  bar_style = "progress_*.png"
+  highlight_style = "track_*.png"
+}

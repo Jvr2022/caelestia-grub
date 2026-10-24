@@ -1,0 +1,32 @@
+name: Check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  grub:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bison flex libfreetype6-dev gettext curl patch python3-venv libcairo2 qemu-system-x86 ovmf openssl sbsigntool
+          python3 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+      - name: Shell syntax
+        run: bash -n install.sh
+      - name: Build
+        run: ./install.sh --build
+      - name: Assets and real UEFI integration
+        run: CAELESTIA_VM_TESTS=1 make test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: grub-captures
+          path: |
+            build/captures/
+            build/serial.log
+            build/qemu-test.log

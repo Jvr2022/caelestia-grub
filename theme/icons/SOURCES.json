@@ -1,0 +1,538 @@
+{
+  "icons": {
+    "arch": {
+      "name": "Arch Linux",
+      "file": "arch.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/archlinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "2b1d26b4a1194c40dc068b2aba4b3a5f9ea83b6a8f1da04c229d03fe80308bfa",
+      "collection": "Simple Icons",
+      "source": "https://www.archlinux.org/art",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://wiki.archlinux.org/index.php/DeveloperWiki:TrademarkPolicy#Logo_Usage_Guidelines"
+    },
+    "cachyos": {
+      "name": "CachyOS",
+      "file": "cachyos.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/cachyos.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "dccfdaee811bc63c6a235fae6d5961661d860a00be58ebab3759853f521387d7",
+      "collection": "Simple Icons",
+      "source": "https://commons.wikimedia.org/wiki/File:CachyOS_Logo.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "windows": {
+      "name": "Windows 11",
+      "file": "windows.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/11.15.0/icons/windows11.svg",
+      "revision": "11.15.0",
+      "sha256": "474ee3ca7e8a4cf7cd4d5073f0a88829e414c280551dfa612a74db5f37af5c5e",
+      "collection": "Simple Icons",
+      "source": "https://commons.wikimedia.org/wiki/File:Windows_logo_-_2021_(Black).svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RE1voQq"
+    },
+    "macos": {
+      "name": "Apple",
+      "file": "macos.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/apple.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "2a1509dccd25e6d2bc7a11a8e52941077e1a48555e192ce638699b9f083c2a7c",
+      "collection": "Simple Icons",
+      "source": "https://www.apple.com",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "linux": {
+      "name": "Linux",
+      "file": "linux.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/linux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "7e55f2779ae11a83c9dad2d0414a65d8ca7867d0716ce58bfe41ed299ae1447f",
+      "collection": "Simple Icons",
+      "source": "https://www.linuxfoundation.org/the-linux-mark/",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "ubuntu": {
+      "name": "Ubuntu",
+      "file": "ubuntu.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/ubuntu.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "b0aca674c881a07bb60b26afbcee07093ae419e29ee38e376f938817fa66ae03",
+      "collection": "Simple Icons",
+      "source": "https://design.ubuntu.com/resources",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://design.ubuntu.com/brand"
+    },
+    "debian": {
+      "name": "Debian",
+      "file": "debian.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/debian.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "8835536d63c80990f9c90c935982ba329d163e707c894278ca6bd73258d1962b",
+      "collection": "Simple Icons",
+      "source": "https://www.debian.org/logos",
+      "license": {
+        "type": "CC-BY-SA-3.0"
+      },
+      "guidelines": "https://www.debian.org/logos/"
+    },
+    "fedora": {
+      "name": "Fedora",
+      "file": "fedora.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/fedora.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "c234757373cab5ed80d7b2df8ff26ea039bcec16a9e9a47adbd29f5d0e94489a",
+      "collection": "Simple Icons",
+      "source": "https://docs.fedoraproject.org/en-US/project/brand/",
+      "license": {
+        "type": "custom",
+        "url": "https://docs.fedoraproject.org/en-US/project/brand/"
+      },
+      "guidelines": "https://fedoraproject.org/wiki/Legal:Trademark_guidelines"
+    },
+    "nixos": {
+      "name": "NixOS",
+      "file": "nixos.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/nixos.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "08e3442ba2b81fd8bb50c745ab354b96128a80e8884969f7dace33fe7d15a921",
+      "collection": "Simple Icons",
+      "source": "https://brand.nixos.org/logos/nixos-logomark-black-flat-minimal.svg",
+      "license": {
+        "type": "CC-BY-4.0"
+      },
+      "guidelines": "https://brand.nixos.org/documents/nixos-branding-guide.pdf"
+    },
+    "manjaro": {
+      "name": "Manjaro",
+      "file": "manjaro.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/manjaro.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "b2d57d08c236453310773ca2f12163ce53e6757ba1698c10a8c0d39ac7cf0019",
+      "collection": "Simple Icons",
+      "source": "https://manjaro.org",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "endeavouros": {
+      "name": "EndeavourOS",
+      "file": "endeavouros.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/endeavouros.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "f3963917a83a19829333cecbc9b237a1e7b3950b5dfb92ec8d27e2faf218a8d2",
+      "collection": "Simple Icons",
+      "source": "https://github.com/endeavouros-team/endeavouros-theming/blob/135f642c980ed8d8fc212783eb478f96226f6c72/endeavouros-logo-text.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "pop": {
+      "name": "Pop!_OS",
+      "file": "pop.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/popos.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "b74950a4c3b1dd2300dc1fad68cfaf45843826408dd328d06497b42379bade1e",
+      "collection": "Simple Icons",
+      "source": "https://github.com/system76/brand/blob/7a31740b54f929b62a165baa61dfb0b5164261e8/Pop_OS%20branding/Pop_icon.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "almalinux": {
+      "name": "AlmaLinux",
+      "file": "almalinux.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/almalinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "d31e95e025c2299efb0fcbf64965081c5815ae32a54ad39db20b0c16327a6ef6",
+      "collection": "Simple Icons",
+      "source": "https://almalinux.org",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://almalinux.org/p/the-almalinux-os-trademark-usage-policy/"
+    },
+    "alpine": {
+      "name": "Alpine Linux",
+      "file": "alpine.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/alpinelinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "d37d0a7873c65174308d63929f09ab93c3aaa7f5c5df79cdec4be532e015fc98",
+      "collection": "Simple Icons",
+      "source": "https://alpinelinux.org",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "artix": {
+      "name": "Artix Linux",
+      "file": "artix.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/artixlinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "c934e6c05a5ca0b8eed7786852e4d6ec399d77dec9bfc4d14c6c9379393e45b7",
+      "collection": "Simple Icons",
+      "source": "https://gitea.artixlinux.org/artix/artwork/src/commit/256432e3d06b3e9024bfd6912768e80281ea3746/icons/logo-gray.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "centos": {
+      "name": "CentOS",
+      "file": "centos.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/centos.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "94a3ca4414ed77c8bdf1ff0bd6d40d64ac4e27bd863889af50044ab6167ce1fa",
+      "collection": "Simple Icons",
+      "source": "https://wiki.centos.org/ArtWork/Brand/Logo",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "deepin": {
+      "name": "deepin",
+      "file": "deepin.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/deepin.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "dad2d66d0b1c74e6d80c597545a6c18bd84dbf384a23101d7d109c27cf0f9517",
+      "collection": "Simple Icons",
+      "source": "https://commons.wikimedia.org/wiki/File:Deepin_logo.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "elementary": {
+      "name": "elementary",
+      "file": "elementary.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/elementary.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "da092a1d0868b7c36132fb4da9f9657c1963660df8ce931ff9dab363aebf14a2",
+      "collection": "Simple Icons",
+      "source": "https://elementary.io/brand",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "freebsd": {
+      "name": "FreeBSD",
+      "file": "freebsd.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/freebsd.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "57c61b8658266e79ae3d753d367ebb56d5157e929fc72b2bc6ba7fe7a1059584",
+      "collection": "Simple Icons",
+      "source": "https://www.freebsdfoundation.org/about/project/",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "gentoo": {
+      "name": "Gentoo",
+      "file": "gentoo.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/gentoo.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "894c74754481396130effc60dc3f3a4022bfa863c1ec78344f3c77bb9b73851f",
+      "collection": "Simple Icons",
+      "source": "https://wiki.gentoo.org/wiki/Project:Artwork/Artwork#Variations_of_the_.22g.22_logo",
+      "license": {
+        "type": "CC-BY-SA-2.5"
+      },
+      "guidelines": "https://www.gentoo.org/inside-gentoo/foundation/name-logo-guidelines.html"
+    },
+    "kali": {
+      "name": "Kali Linux",
+      "file": "kali.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/kalilinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "0ceffe5e8ce02aae42f7f5f6cada390f79e5ab6450a4e460b03127a370c33a1a",
+      "collection": "Simple Icons",
+      "source": "https://www.kali.org/docs/policy/trademark/",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://www.kali.org/docs/policy/trademark/"
+    },
+    "kubuntu": {
+      "name": "Kubuntu",
+      "file": "kubuntu.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/kubuntu.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "d54ef7175b3d5ad5414752d9ea170b91cfa3117916b8aabca1b52b3ee68a16cc",
+      "collection": "Simple Icons",
+      "source": "https://kubuntu.org",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "linuxmint": {
+      "name": "Linux Mint",
+      "file": "linuxmint.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/linuxmint.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "ab7e227a8e7b7d167d8bc4617c6323c205b4565ce1c206e6d1fd677669cd27d4",
+      "collection": "Simple Icons",
+      "source": "https://github.com/linuxmint/brand-logo/blob/540ac3b08e987866d77a340f557f994c988ac2ae/ring-mono-green.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "lubuntu": {
+      "name": "Lubuntu",
+      "file": "lubuntu.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/lubuntu.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "8f5b1845c23549105e6d74dfb0ab960cfa74057d9101019e982741729b9d0ba0",
+      "collection": "Simple Icons",
+      "source": "https://lubuntu.net",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "mxlinux": {
+      "name": "MX Linux",
+      "file": "mxlinux.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/mxlinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "44d723b9a5c8b19c42800678f5ebf5800b2eaa31690c4f52adc381ba7027f187",
+      "collection": "Simple Icons",
+      "source": "https://mxlinux.org/art/",
+      "license": {
+        "type": "GPL-3.0-only"
+      },
+      "guidelines": null
+    },
+    "neon": {
+      "name": "KDE neon",
+      "file": "neon.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/kdeneon.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "f6ba5121d4a48628fb2e5935a13acdb1d02dfe659b4253553f7d59330a587aac",
+      "collection": "Simple Icons",
+      "source": "https://community.kde.org/Neon",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "opensuse": {
+      "name": "openSUSE",
+      "file": "opensuse.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/opensuse.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "22f842b1d6b2cf32b7b1a569708c2ca73bd5cae627def4e45e15d07915f0d6bf",
+      "collection": "Simple Icons",
+      "source": "https://github.com/openSUSE/artwork/blob/33e94aa76837c09f03d1712705949b71a246a53b/logos/buttons/button-colour.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": "https://en.opensuse.org/Portal:Artwork"
+    },
+    "rocky": {
+      "name": "Rocky Linux",
+      "file": "rocky.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/rockylinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "a65476b168c4ef14c6b743e7eb3875e56c9d60ca15bbaef57a72a6cdeab242d0",
+      "collection": "Simple Icons",
+      "source": "https://github.com/rocky-linux/branding/blob/94e97dd30b87d909cc4f6a6838a2926f77f9ac47/logo/src/icon-black.svg",
+      "license": {
+        "type": "CC-BY-SA-4.0"
+      },
+      "guidelines": null
+    },
+    "slackware": {
+      "name": "Slackware",
+      "file": "slackware.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/slackware.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "efeef939c245d77970c2b7f23ce78e47a678797c0e6e221bc6a584ddf2714fb2",
+      "collection": "Simple Icons",
+      "source": "https://en.wikipedia.org/wiki/Slackware",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "solus": {
+      "name": "Solus",
+      "file": "solus.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/solus.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "c7fd902d2bf53f2330d015fe8f51912b396f2f1106085c5154d5079dd1b4a59b",
+      "collection": "Simple Icons",
+      "source": "https://getsol.us/branding/",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "tails": {
+      "name": "Tails",
+      "file": "tails.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/tails.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "c87ad7c6bad80f46f2b023e117ef9e73f9b90ab353836dfd5e953e7546fc8a3a",
+      "collection": "Simple Icons",
+      "source": "https://tails.boum.org/contribute/how/promote/material/logo/",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "void": {
+      "name": "Void Linux",
+      "file": "void.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/voidlinux.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "33edc76feaa84a0a8fbe5f5bf56b2bd8a5d6a7b01a0917bb5e17096b86e49e69",
+      "collection": "Simple Icons",
+      "source": "https://alpha.de.repo.voidlinux.org/logos/void-dark2.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "xubuntu": {
+      "name": "Xubuntu",
+      "file": "xubuntu.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/xubuntu.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "b6bd33d6ab14df721356de35ccbe12771595132b1253caf52d72a80a10bd0434",
+      "collection": "Simple Icons",
+      "source": "https://commons.wikimedia.org/wiki/File:Xubuntu_Icon.svg",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "zorin": {
+      "name": "Zorin",
+      "file": "zorin.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/zorin.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "2ae2329d284e84afbd7111b7a4ffd52fdc38b0d139c045f7439f2b3f687e3e43",
+      "collection": "Simple Icons",
+      "source": "https://zorin.com/press",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "android": {
+      "name": "Android",
+      "file": "android.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/android.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "ff571c5e21163f07dd7176d4670411344f55409d36eb6346b402210ad7c02c4b",
+      "collection": "Simple Icons",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/android/visual-identity/visual-identity/logo-lock-ups",
+      "license": {
+        "type": "CC-BY-3.0"
+      },
+      "guidelines": "https://developer.android.com/distribute/marketing-tools/brand-guidelines#brand-android"
+    },
+    "ubuntumate": {
+      "name": "Ubuntu MATE",
+      "file": "ubuntumate.svg",
+      "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/90bd1f3e7b77851fd0c56474f6fa43b816babdab/icons/ubuntumate.svg",
+      "revision": "90bd1f3e7b77851fd0c56474f6fa43b816babdab",
+      "sha256": "be842a2b5d3608255fade5fb6e7eb4aea0dc1cb7920cb4631459dc9c580f5be3",
+      "collection": "Simple Icons",
+      "source": "https://ubuntu-mate.org",
+      "license": {
+        "type": "not-specified-by-upstream"
+      },
+      "guidelines": null
+    },
+    "recovery": {
+      "name": "square-terminal",
+      "file": "recovery.svg",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/square-terminal.svg",
+      "revision": "0.468.0",
+      "sha256": "1fd2b783881ed8b0675995910fe98625789119e390420931eca6ddbc91c17932",
+      "collection": "Lucide",
+      "source": "https://lucide.dev",
+      "license": {
+        "type": "ISC"
+      }
+    },
+    "firmware": {
+      "name": "cpu",
+      "file": "firmware.svg",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/cpu.svg",
+      "revision": "0.468.0",
+      "sha256": "6fb8cf8edbbbaa4b6a47ddbcc6879e8d2166613c663b93db0ac1fde566515362",
+      "collection": "Lucide",
+      "source": "https://lucide.dev",
+      "license": {
+        "type": "ISC"
+      }
+    },
+    "unknown": {
+      "name": "circle-help",
+      "file": "unknown.svg",
+      "url": "https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/circle-help.svg",
+      "revision": "0.468.0",
+      "sha256": "975db087da041530dbf59ba1e61a7b99c3519fad43dae6375e42ccc74ba63924",
+      "collection": "Lucide",
+      "source": "https://lucide.dev",
+      "license": {
+        "type": "ISC"
+      }
+    }
+  },
+  "aliases": {
+    "archlinux": "arch",
+    "arch-linux": "arch",
+    "gnu-linux": "linux",
+    "os": "unknown",
+    "efi": "firmware",
+    "uefi": "firmware",
+    "memtest": "recovery",
+    "windows11": "windows",
+    "windows10": "windows",
+    "win": "windows",
+    "apple": "macos",
+    "macosx": "macos",
+    "osx": "macos",
+    "popos": "pop",
+    "pop-os": "pop",
+    "alpinelinux": "alpine",
+    "artixlinux": "artix",
+    "kalilinux": "kali",
+    "mint": "linuxmint",
+    "kdeneon": "neon",
+    "rockylinux": "rocky",
+    "voidlinux": "void",
+    "suse": "opensuse",
+    "opensuse-tumbleweed": "opensuse",
+    "opensuse-leap": "opensuse",
+    "ubuntu-mate": "ubuntumate",
+    "linux-mint": "linuxmint"
+  }
+}

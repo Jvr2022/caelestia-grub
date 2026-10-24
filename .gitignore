@@ -1,0 +1,5 @@
+.venv/
+.cache/
+.ruff_cache/
+build/
+__pycache__/

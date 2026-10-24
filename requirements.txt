@@ -1,0 +1,4 @@
+Pillow>=11,<13
+fonttools>=4.55,<5
+CairoSVG>=2.7,<3
+virt-firmware>=24.7,<27

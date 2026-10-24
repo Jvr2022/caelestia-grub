@@ -1,0 +1,775 @@
+--- a/include/grub/gfxmenu_view.h
++++ b/include/grub/gfxmenu_view.h
+@@ -44,6 +44,8 @@
+                                   const char *pattern, const char *theme_dir);
+ 
+ void grub_gfxmenu_view_draw (grub_gfxmenu_view_t view);
++void grub_gfxmenu_view_boot (grub_gfxmenu_view_t view, const char *title);
++int grub_gfxmenu_font_size (grub_gfxmenu_view_t view, int base);
+ 
+ void
+ grub_gfxmenu_redraw_menu (grub_gfxmenu_view_t view);
+@@ -111,6 +113,8 @@
+   int double_repaint;
+ 
+   int selected;
++  int carousel_position;
++  int carousel_animating;
+ 
+   grub_video_rect_t progress_message_frame;
+ 
+--- a/include/grub/menu_viewer.h
++++ b/include/grub/menu_viewer.h
+@@ -42,6 +42,8 @@
+ grub_menu_try_text (struct grub_term_output *term,
+ 		    int entry, grub_menu_t menu, int nested);
+ 
++extern int (*grub_gfxmenu_boot_hook) (grub_menu_entry_t entry);
++
+ extern grub_err_t (*grub_gfxmenu_try_hook) (int entry, grub_menu_t menu,
+ 					    int nested);
+ 
+--- a/grub-core/gfxmenu/gui_list.c
++++ b/grub-core/gfxmenu/gui_list.c
+@@ -68,6 +68,11 @@
+   int scrollbar_bottom_pad;
+ 
+   int first_shown_index;
++  struct {
++    grub_menu_entry_t entry;
++    int maximum;
++    struct grub_video_bitmap *sizes[17];
++  } carousel_cache[7];
+ 
+   int need_to_recreate_boxes;
+   char *theme_dir;
+@@ -86,11 +91,14 @@
+ 
+ typedef struct grub_gui_list_impl *list_impl_t;
+ 
++static void carousel_clear (list_impl_t self);
++
+ static void
+ list_destroy (void *vself)
+ {
+   list_impl_t self = vself;
+ 
++  carousel_clear (self);
+   grub_free (self->theme_dir);
+   grub_free (self->menu_box_pattern);
+   grub_free (self->item_box_pattern);
+@@ -233,6 +241,8 @@
+ 
+   return grub_gfxmenu_icon_manager_get_icon (self->icon_manager, entry);
+ }
++
++#include "carousel.inc"
+ 
+ static void
+ make_selected_item_visible (list_impl_t self)
+@@ -462,6 +472,11 @@
+   if (!grub_video_have_common_points (region, &self->bounds))
+     return;
+ 
++  if (self->id && grub_strcmp (self->id, "caelestia-carousel") == 0)
++    {
++      carousel_paint (self);
++      return;
++    }
+   check_boxes (self);
+ 
+   if (! self->menu_box || ! self->selected_item_box || ! self->item_box)
+@@ -858,6 +873,7 @@
+                    grub_gfxmenu_view_t view)
+ {
+   list_impl_t self = vself;
++  carousel_clear (self);
+   if (view->nested)
+     self->first_shown_index = 0;
+ }
+--- a/grub-core/gfxmenu/view.c
++++ b/grub-core/gfxmenu/view.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <grub/types.h>
++#include <grub/env.h>
+ #include <grub/file.h>
+ #include <grub/misc.h>
+ #include <grub/mm.h>
+@@ -72,6 +73,8 @@
+   view->screen.width = width;
+   view->screen.height = height;
+ 
++  view->carousel_position = 0;
++  view->carousel_animating = 0;
+   view->need_to_check_sanity = 1;
+   view->terminal_border = 3;
+   view->terminal_rect.width = view->screen.width * 7 / 10;
+@@ -339,9 +342,59 @@
+     grub_video_set_area_status (GRUB_VIDEO_AREA_ENABLED);
+ }
+ 
++int
++grub_gfxmenu_font_size (grub_gfxmenu_view_t view, int base)
++{
++  const int sizes[] = { 12, 14, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128 };
++  int target = base * grub_min (view->screen.height * 1024 / 1080,
++                                view->screen.width * 1024 / 1280) / 1024;
++  unsigned i;
++  int result = sizes[0];
++  for (i = 0; i < ARRAY_SIZE (sizes); i++)
++    if (sizes[i] <= target) result = sizes[i];
++  return result;
++}
++
++static void
++caelestia_layout (grub_gui_component_t component, void *data)
++{
++  grub_gfxmenu_view_t view = data;
++  const char *id = component->ops->get_id (component);
++  char font[48];
++  if (!id) return;
++  if (!grub_strcmp (id, "caelestia-heading"))
++    {
++      grub_snprintf (font, sizeof (font), "Caelestia Regular %d",
++                     grub_gfxmenu_font_size (view, 32));
++      component->ops->set_property (component, "font", font);
++    }
++  else if (!grub_strcmp (id, "__timeout__"))
++    {
++      grub_snprintf (font, sizeof (font), "Caelestia Regular %d",
++                     grub_gfxmenu_font_size (view, 16));
++      component->ops->set_property (component, "font", font);
++    }
++  else if (!grub_strcmp (id, "caelestia-controls"))
++    {
++      grub_video_rect_t bounds;
++      int width = grub_min (view->screen.width * 90 / 100,
++                            640 * grub_max (810, view->screen.height) / 1080);
++      component->ops->get_bounds (component, &bounds);
++      bounds.width = grub_max (160, width);
++      bounds.height = bounds.width / 16;
++      bounds.x = (view->screen.width - bounds.width) / 2;
++      component->ops->set_bounds (component, &bounds);
++    }
++}
++
+ void
+ grub_gfxmenu_view_draw (grub_gfxmenu_view_t view)
+ {
++  grub_free (view->progress_message_text);
++  view->progress_message_text = 0;
++  if (view->theme_path && grub_strstr (view->theme_path, "/carousel.txt"))
++    grub_gui_iterate_recursively ((grub_gui_component_t) view->canvas,
++                                  caelestia_layout, view);
+   init_terminal (view);
+ 
+   init_background (view);
+@@ -406,7 +459,33 @@
+ {
+   grub_gfxmenu_view_t view = data;
+ 
++  const char *enabled = grub_env_get ("caelestia_carousel");
++  const char *motion = grub_env_get ("caelestia_motion");
++  int previous = view->selected;
+   view->selected = entry;
++  if (enabled && grub_strcmp (enabled, "1") == 0
++      && (!motion || grub_strcmp (motion, "0") != 0)
++      && grub_abs (entry - previous) == 1)
++    {
++      grub_uint64_t start = grub_get_time_ms ();
++      int t;
++      view->carousel_animating = 1;
++      do
++        {
++          /* Fixed-point cubic ease-out. Frame rate follows firmware speed.
++             240 ms maximum input delay; no keys are consumed by animation. */
++          int inverse;
++          t = grub_min (1024, (int) (grub_get_time_ms () - start) * 1024 / 240);
++          inverse = 1024 - t;
++          view->carousel_position = previous * 1024 + (entry - previous)
++            * (1024 - inverse * inverse / 1024 * inverse / 1024);
++          grub_gfxmenu_redraw_menu (view);
++          if (t < 1024)
++            grub_millisleep (8);
++        }
++      while (t < 1024);
++      view->carousel_animating = 0;
++    }
+   grub_gfxmenu_redraw_menu (view);
+ }
+ 
+@@ -420,6 +499,43 @@
+     return;
+ 
+   grub_video_set_area_status (GRUB_VIDEO_AREA_DISABLED);
++
++  if (term_view->theme_path && grub_strstr (term_view->theme_path, "/carousel.txt"))
++    {
++      grub_video_rect_t saved, header;
++      grub_font_t font;
++      char font_name[48];
++      char *title = term_view->progress_message_text
++        ? grub_xasprintf ("Booting %s", term_view->progress_message_text) : 0;
++      int size = grub_gfxmenu_font_size (term_view, 24);
++      grub_snprintf (font_name, sizeof (font_name), "Caelestia Regular %d", size);
++      font = grub_font_get (font_name);
++      grub_video_set_viewport (0, 0, term_view->screen.width, term_view->screen.height);
++      /* A single quiet surface, rather than a frame around another frame. */
++      grub_video_fill_rect (grub_video_map_rgba_color (term_view->message_bg_color),
++                            0, 0, term_view->screen.width, term_view->screen.height);
++      header.x = term_view->terminal_rect.x;
++      header.y = grub_max (0, (int) term_view->terminal_rect.y - size * 3);
++      header.width = term_view->terminal_rect.width;
++      header.height = size * 2;
++      grub_gui_set_viewport (&header, &saved);
++      grub_font_draw_string (title ? title : "Console", font,
++                            grub_video_map_rgb (208, 188, 255), 0,
++                            grub_font_get_ascent (font));
++      grub_gui_restore_viewport (&saved);
++      grub_free (title);
++      if (!term_view->progress_message_text)
++        {
++          grub_snprintf (font_name, sizeof (font_name), "Caelestia Regular %d",
++                         grub_gfxmenu_font_size (term_view, 16));
++          font = grub_font_get (font_name);
++          grub_font_draw_string ("Tab  Complete     Esc  Return", font,
++                                grub_video_map_rgb (153, 143, 170), header.x,
++                                term_view->screen.height * 94 / 100);
++        }
++      grub_errno = GRUB_ERR_NONE;
++      return;
++    }
+ 
+   term_box->set_content_size (term_box, term_view->terminal_rect.width,
+ 			      term_view->terminal_rect.height);
+@@ -437,9 +553,11 @@
+ {
+   struct grub_font_glyph *glyph;
+   glyph = grub_font_get_glyph (terminal_font, 'M');
+-  *min_terminal_width = (glyph? glyph->device_width : 8) * 80
++  int compact = term_view && term_view->theme_path
++    && grub_strstr (term_view->theme_path, "/carousel.txt");
++  *min_terminal_width = (glyph? glyph->device_width : 8) * (compact ? 40 : 80)
+                         + 2 * border_width;
+-  *min_terminal_height = grub_font_get_max_char_height (terminal_font) * 24
++  *min_terminal_height = grub_font_get_max_char_height (terminal_font) * (compact ? 12 : 24)
+                          + 2 * border_width;
+ }
+ 
+@@ -524,6 +642,14 @@
+ {
+   grub_font_t terminal_font;
+ 
++  if (view->theme_path && grub_strstr (view->theme_path, "/carousel.txt"))
++    {
++      char name[48];
++      grub_snprintf (name, sizeof (name), "Caelestia Mono Regular %d",
++                     grub_min (96, grub_gfxmenu_font_size (view, 24)));
++      grub_free (view->terminal_font_name);
++      view->terminal_font_name = grub_strdup (name);
++    }
+   terminal_font = grub_font_get (view->terminal_font_name);
+   if (!terminal_font)
+     {
+@@ -531,10 +657,17 @@
+       return;
+     }
+ 
++  term_view = view;
+   /* Check that terminal window size and position are sane. */
+   terminal_sanity_check (view);
+ 
+-  term_view = view;
++  if (view->theme_path && grub_strstr (view->theme_path, "/carousel.txt"))
++    {
++      grub_gfxterm_background.default_bg_color = view->message_bg_color;
++      grub_video_bitmap_destroy (grub_gfxterm_background.bitmap);
++      grub_gfxterm_background.bitmap = 0;
++      grub_gfxterm_background.blend_text_bg = 1;
++    }
+ 
+   /* Note: currently there is no API for changing the gfxterm font
+      on the fly, so whatever font the initially loaded theme specifies
+@@ -587,69 +720,15 @@
+ 
+ }
+ 
+-/* FIXME: previously notifications were displayed in special case.
+-   Is it necessary?
+- */
+-#if 0
+-/* Sets MESSAGE as the progress message for the view.
+-   MESSAGE can be 0, in which case no message is displayed.  */
+-static void
+-set_progress_message (grub_gfxmenu_view_t view, const char *message)
++/* Keep the styled graphical terminal active for loading output and errors.
++   No delay, input consumption, boot command changes or hidden diagnostics. */
++void
++grub_gfxmenu_view_boot (grub_gfxmenu_view_t view, const char *title)
+ {
+   grub_free (view->progress_message_text);
+-  if (message)
+-    view->progress_message_text = grub_strdup (message);
+-  else
+-    view->progress_message_text = 0;
+-}
+-
+-static void
+-notify_booting (grub_menu_entry_t entry, void *userdata)
+-{
+-  grub_gfxmenu_view_t view = (grub_gfxmenu_view_t) userdata;
+-
+-  char *s = grub_malloc (100 + grub_strlen (entry->title));
+-  if (!s)
+-    return;
+-
+-  grub_sprintf (s, "Booting '%s'", entry->title);
+-  set_progress_message (view, s);
+-  grub_free (s);
+-  grub_gfxmenu_view_redraw (view, &view->progress_message_frame);
+-  grub_video_swap_buffers ();
+-  if (view->double_repaint)
+-    grub_gfxmenu_view_redraw (view, &view->progress_message_frame);
+-}
+-
+-static void
+-notify_fallback (grub_menu_entry_t entry, void *userdata)
+-{
+-  grub_gfxmenu_view_t view = (grub_gfxmenu_view_t) userdata;
+-
+-  char *s = grub_malloc (100 + grub_strlen (entry->title));
+-  if (!s)
+-    return;
+-
+-  grub_sprintf (s, "Falling back to '%s'", entry->title);
+-  set_progress_message (view, s);
+-  grub_free (s);
+-  grub_gfxmenu_view_redraw (view, &view->progress_message_frame);
+-  grub_video_swap_buffers ();
+-  if (view->double_repaint)
+-    grub_gfxmenu_view_redraw (view, &view->progress_message_frame);
+-}
+-
+-static void
+-notify_execution_failure (void *userdata __attribute__ ((unused)))
+-{
+-}
+-
+-
+-static struct grub_menu_execute_callback execute_callback =
+-{
+-  .notify_booting = notify_booting,
+-  .notify_fallback = notify_fallback,
+-  .notify_failure = notify_execution_failure
+-};
+-
+-#endif
++  view->progress_message_text = grub_strdup (title);
++  if (!view->progress_message_text)
++    grub_errno = GRUB_ERR_NONE;
++  grub_gfxterm_schedule_repaint ();
++  grub_cls ();
++}
+--- a/grub-core/gfxmenu/gfxmenu.c
++++ b/grub-core/gfxmenu/gfxmenu.c
+@@ -41,6 +41,24 @@
+ GRUB_MOD_LICENSE ("GPLv3+");
+ 
+ static grub_gfxmenu_view_t cached_view;
++
++static int
++caelestia_boot (grub_menu_entry_t entry)
++{
++  grub_term_output_t output;
++  const char *enabled = grub_env_get ("caelestia_carousel");
++  const char *theme = grub_env_get ("theme");
++  if (!cached_view || entry->submenu || !enabled || grub_strcmp (enabled, "1")
++      || !theme || !grub_strstr (theme, "/carousel.txt"))
++    return 0;
++  FOR_ACTIVE_TERM_OUTPUTS (output)
++    if (grub_strcmp (output->name, "gfxterm") == 0)
++      {
++        grub_gfxmenu_view_boot (cached_view, entry->title);
++        return 1;
++      }
++  return 0;
++}
+ 
+ static void
+ grub_gfxmenu_viewer_fini (void *data __attribute__ ((unused)))
+@@ -117,6 +135,7 @@
+     }
+ 
+   grub_gfxmenu_view_draw (view);
++  grub_gfxmenu_boot_hook = caelestia_boot;
+ 
+   instance->data = view;
+   instance->set_chosen_entry = grub_gfxmenu_set_chosen_entry;
+@@ -147,4 +166,5 @@
+ {
+   grub_gfxmenu_view_destroy (cached_view);
+   grub_gfxmenu_try_hook = NULL;
++  grub_gfxmenu_boot_hook = NULL;
+ }
+--- a/grub-core/normal/menu.c
++++ b/grub-core/normal/menu.c
+@@ -37,6 +37,8 @@
+ /* Time to delay after displaying an error message about a default/fallback
+    entry failing to boot.  */
+ #define DEFAULT_ENTRY_ERROR_DELAY_MS  2500
++
++int (*grub_gfxmenu_boot_hook) (grub_menu_entry_t entry) = NULL;
+ 
+ grub_err_t (*grub_gfxmenu_try_hook) (int entry, grub_menu_t menu,
+ 				     int nested) = NULL;
+@@ -701,6 +703,22 @@
+ 
+       c = grub_getkey_noblock ();
+ 
++      {
++        const char *carousel = grub_env_get ("caelestia_carousel");
++        const char *active_theme = grub_env_get ("theme");
++        grub_term_output_t output;
++        int graphical = 0;
++        FOR_ACTIVE_TERM_OUTPUTS (output)
++          if (grub_strcmp (output->name, "gfxterm") == 0)
++            graphical = 1;
++        if (graphical && carousel && grub_strcmp (carousel, "1") == 0
++            && active_theme && grub_strstr (active_theme, "/carousel.txt"))
++          {
++            if (c == GRUB_TERM_KEY_LEFT) c = GRUB_TERM_KEY_UP;
++            else if (c == GRUB_TERM_KEY_RIGHT) c = GRUB_TERM_KEY_DOWN;
++          }
++      }
++
+       /* Negative values are returned on error. */
+       if ((c != GRUB_TERM_NO_KEY) && (c > 0))
+ 	{
+@@ -817,6 +835,9 @@
+ {
+   int *notify_boot = userdata;
+ 
++  if (grub_gfxmenu_boot_hook && grub_gfxmenu_boot_hook (entry))
++    return;
++
+   if (*notify_boot)
+     {
+       grub_printf ("  ");
+@@ -885,7 +906,8 @@
+ 					 &execution_callback, &notify_boot);
+       else
+ 	{
+-	  grub_cls ();
++	  if (!grub_gfxmenu_boot_hook || !grub_gfxmenu_boot_hook (e))
++	    grub_cls ();
+ 	  grub_menu_execute_entry (e, 0);
+ 	}
+       if (autobooted)
+--- a/grub-core/normal/main.c
++++ b/grub-core/normal/main.c
+@@ -394,6 +394,16 @@
+ 
+   FOR_ACTIVE_TERM_OUTPUTS(term)
+   {
++    const char *theme = grub_env_get ("theme");
++    const char *carousel = grub_env_get ("caelestia_carousel");
++    if (carousel && !grub_strcmp (carousel, "1") && theme
++        && grub_strstr (theme, "/carousel.txt") && !grub_strcmp (term->name, "gfxterm"))
++      {
++        grub_term_cls (term);
++        grub_term_gotoxy (term, (struct grub_term_coordinate) { 0, 0 });
++        grub_term_setcursor (term, 1);
++        continue;
++      }
+     grub_normal_init_page (term, 1);
+     grub_term_setcursor (term, 1);
+ 
+--- a/grub-core/video/efi_gop.c
++++ b/grub-core/video/efi_gop.c
+@@ -18,6 +18,7 @@
+ 
+ #define grub_video_render_target grub_video_fbrender_target
+ 
++#include <grub/env.h>
+ #include <grub/err.h>
+ #include <grub/types.h>
+ #include <grub/dl.h>
+@@ -361,6 +362,9 @@
+   unsigned long long best_volume = 0;
+   unsigned int preferred_width = 0, preferred_height = 0;
+   grub_uint8_t *buffer;
++  const char *carousel = grub_env_get ("caelestia_carousel");
++  int native = carousel && grub_strcmp (carousel, "1") == 0;
++  int have_preferred = 0;
+ 
+   depth = (mode_type & GRUB_VIDEO_MODE_TYPE_DEPTH_MASK)
+     >> GRUB_VIDEO_MODE_TYPE_DEPTH_POS;
+@@ -368,7 +372,9 @@
+   if (width == 0 && height == 0)
+     {
+       err = grub_gop_get_preferred_mode (&preferred_width, &preferred_height);
+-      if (err || preferred_width >= 4096 || preferred_height >= 4096)
++      have_preferred = !err && preferred_width && preferred_height;
++      if (err || preferred_width >= (native ? 16384U : 4096U)
++          || preferred_height >= (native ? 16384U : 4096U))
+ 	{
+ 	  preferred_width = 800;
+ 	  preferred_height = 600;
+@@ -382,7 +388,10 @@
+       bpp = grub_video_gop_get_bpp (gop->mode->info);
+       if (bpp && ((width == gop->mode->info->width
+ 		   && height == gop->mode->info->height)
+-		  || (width == 0 && height == 0))
++		  || (width == 0 && height == 0
++                       && (!native || !have_preferred
++                           || (gop->mode->info->width == preferred_width
++                               && gop->mode->info->height == preferred_height))))
+ 	  && (depth == bpp || depth == 0))
+ 	{
+ 	  grub_dprintf ("video", "GOP: keeping mode %d\n", gop->mode->mode);
+@@ -454,14 +463,15 @@
+       return grub_error (GRUB_ERR_UNKNOWN_DEVICE, "no matching mode found");
+     }
+ 
+-  if (best_mode != gop->mode->mode)
++  if (native || best_mode != gop->mode->mode)
+     {
+       if (!restore_needed)
+ 	{
+ 	  old_mode = gop->mode->mode;
+ 	  restore_needed = 1;
+ 	}
+-      gop->set_mode (gop, best_mode);
++      if (gop->set_mode (gop, best_mode) != GRUB_EFI_SUCCESS)
++        return grub_error (GRUB_ERR_IO, "firmware rejected GOP video mode");
+     }
+ 
+   info = gop->mode->info;
+--- a/grub-core/video/video.c
++++ b/grub-core/video/video.c
+@@ -17,6 +17,7 @@
+  */
+ 
+ #include <grub/video.h>
++#include <grub/env.h>
+ #include <grub/types.h>
+ #include <grub/dl.h>
+ #include <grub/misc.h>
+@@ -561,6 +562,16 @@
+   char *next_mode;
+   char *current_mode;
+   char *modevar;
++  grub_video_adapter_t adapter;
++  const char *carousel = grub_env_get ("caelestia_carousel");
++  int firmware_only = 0;
++
++  /* A UEFI loader must use GOP modes, rather than a legacy adapter that
++     bypasses firmware and can leave its framebuffer geometry out of sync. */
++  if (carousel && !grub_strcmp (carousel, "1"))
++    for (adapter = grub_video_adapter_list; adapter; adapter = adapter->next)
++      if (adapter->id == GRUB_VIDEO_DRIVER_EFI_GOP)
++        firmware_only = 1;
+ 
+   if (grub_video_adapter_active && grub_video_adapter_active->id == GRUB_VIDEO_ADAPTER_CAPTURE)
+     return GRUB_ERR_NONE;
+@@ -722,6 +733,8 @@
+ 	{
+ 	  struct grub_video_mode_info mode_info;
+ 
++          if (firmware_only && p->id != GRUB_VIDEO_DRIVER_EFI_GOP)
++            continue;
+ 	  grub_memset (&mode_info, 0, sizeof (mode_info));
+ 
+ 	  /* Try to initialize adapter, if it fails, skip to next adapter.  */
+--- /dev/null
++++ b/grub-core/gfxmenu/carousel.inc
+@@ -0,0 +1,157 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later
++ * Included by gui_list.c. Software-rendered carousel, bounded bitmap cache.
++ * No floating point, filesystem writes, menu model changes or boot commands.
++ */
++static void
++carousel_clear (list_impl_t self)
++{
++  int i, j;
++  for (i = 0; i < 7; i++)
++    {
++      for (j = 0; j < 17; j++)
++        {
++          grub_video_bitmap_destroy (self->carousel_cache[i].sizes[j]);
++          self->carousel_cache[i].sizes[j] = 0;
++        }
++      self->carousel_cache[i].entry = 0;
++    }
++}
++
++static struct grub_video_bitmap *
++carousel_icon (list_impl_t self, int index, int level, int maximum)
++{
++  int slot = index % 7, j;
++  grub_menu_entry_t entry = grub_menu_get_entry (self->view->menu, index);
++  struct grub_video_bitmap *source;
++  int size = maximum * (16 + level) / 32;
++
++  if (self->carousel_cache[slot].entry != entry
++      || self->carousel_cache[slot].maximum != maximum)
++    {
++      for (j = 0; j < 17; j++)
++        {
++          grub_video_bitmap_destroy (self->carousel_cache[slot].sizes[j]);
++          self->carousel_cache[slot].sizes[j] = 0;
++        }
++      self->carousel_cache[slot].entry = entry;
++      self->carousel_cache[slot].maximum = maximum;
++    }
++  if (!self->carousel_cache[slot].sizes[level])
++    {
++      source = get_item_icon (self, index);
++      if (!source)
++        {
++          struct grub_menu_entry_class generic = { .name = entry && entry->submenu ? "recovery" : "os", .next = 0 };
++          struct grub_menu_entry fallback = { .classes = &generic };
++          source = grub_gfxmenu_icon_manager_get_icon (self->icon_manager, &fallback);
++        }
++      if (source)
++        grub_video_bitmap_create_scaled (&self->carousel_cache[slot].sizes[level],
++                                         size, size, source,
++                                         GRUB_VIDEO_BITMAP_SCALE_METHOD_BEST);
++      /* Missing art never prevents booting or painting the title. */
++      grub_errno = GRUB_ERR_NONE;
++    }
++  return self->carousel_cache[slot].sizes[level];
++}
++
++static void
++carousel_paint (list_impl_t self)
++{
++  grub_gfxmenu_view_t view = self->view;
++  int position = view->carousel_animating ? view->carousel_position : view->selected * 1024;
++  int focus = position / 1024;
++  int w = self->bounds.width, h = self->bounds.height;
++  int scale = grub_min (view->screen.height * 1024 / 1080,
++                        view->screen.width * 1024 / 1280);
++  int maximum = grub_min (320 * scale / 1024,
++                          grub_min (w * 25 / 100, h * 61 / 100));
++  int spacing = grub_min (w * 30 / 100, h * 82 / 100);
++  int i;
++  grub_video_rect_t saved;
++
++  grub_gui_set_viewport (&self->bounds, &saved);
++  for (i = grub_max (0, focus - 2); i <= grub_min (view->menu->size - 1, focus + 3); i++)
++    {
++      int delta = i * 1024 - position;
++      int distance = grub_abs (delta);
++      int level = 16 - grub_min (16, distance * 16 / 1024);
++      int size = maximum * (16 + level) / 32;
++      int x = w / 2 + delta * spacing / 1024;
++      int y = h * 42 / 100;
++      struct grub_video_bitmap *icon;
++      grub_menu_entry_t entry;
++      grub_font_t f;
++      int tw;
++      char *title;
++      if (distance > 1536 || x - size / 2 < 0 || x + size / 2 > w)
++        continue;
++      icon = carousel_icon (self, i, level, maximum);
++      if (icon)
++        grub_video_blit_bitmap (icon, GRUB_VIDEO_BLIT_BLEND,
++                                x - size / 2, y - size / 2, 0, 0, size, size);
++      entry = grub_menu_get_entry (view->menu, i);
++      if (!entry)
++        continue;
++      {
++        char name[48];
++        grub_snprintf (name, sizeof (name), "Caelestia Regular %d",
++                       grub_gfxmenu_font_size (view, i == view->selected ? 24 : 20));
++        f = grub_font_get (name);
++      }
++      /* Never pass signed coordinates to GRUB's unsigned viewport API.
++         Only complete columns are painted; no offscreen text can leak. */
++      {
++        int width = spacing * 90 / 100;
++        int left = x - width / 2;
++        int top = y + size / 2 + grub_max (10, h * 2 / 100);
++        int height = grub_font_get_ascent (f) + grub_font_get_descent (f) + 4;
++        grub_video_rect_t clip, title_saved;
++        if (left < 0 || left + width > w || top < 0 || top + height > h)
++          continue;
++        title = grub_strdup (entry->title);
++        if (!title)
++          { grub_errno = GRUB_ERR_NONE; continue; }
++        tw = grub_font_get_string_width (f, title);
++        if (tw > width)
++          {
++            /* Truncate at UTF-8 boundaries, leaving room for an ellipsis.
++               The actual menu title and boot commands remain untouched. */
++            grub_size_t end = grub_strlen (title);
++            int dots = grub_font_get_string_width (f, "...");
++            while (end && grub_font_get_string_width (f, title) > width - dots)
++              {
++                do { end--; } while (end && (title[end] & 0xc0) == 0x80);
++                title[end] = 0;
++              }
++            grub_free (title);
++            title = grub_xasprintf ("%.*s...", (int) end, entry->title);
++            if (!title)
++              { grub_errno = GRUB_ERR_NONE; continue; }
++            tw = grub_font_get_string_width (f, title);
++          }
++        clip.x = left; clip.y = top; clip.width = width; clip.height = height;
++        grub_gui_set_viewport (&clip, &title_saved);
++        grub_font_draw_string (title, f,
++                               grub_video_map_rgba_color ((i == view->selected)
++                                 ? self->selected_item_color : self->item_color),
++                               grub_max (0, (width - tw) / 2),
++                               grub_font_get_ascent (f));
++        grub_gui_restore_viewport (&title_saved);
++        grub_free (title);
++      }
++    }
++  /* Discrete position marks are useful for menus longer than three entries. */
++  {
++    int unit = grub_max (2, 4 * scale / 1024);
++    int step = grub_max (10, 18 * scale / 1024);
++    int count = grub_min (9, view->menu->size);
++    int first = grub_max (0, grub_min (view->selected - 4, view->menu->size - count));
++    for (i = 0; i < count; i++)
++      grub_video_fill_rect (grub_video_map_rgba_color ((first + i == view->selected)
++                            ? self->selected_item_color : self->item_color),
++                            w / 2 - count * step / 2 + i * step, h - unit * 2,
++                            first + i == view->selected ? unit * 3 : unit, unit);
++  }
++  grub_gui_restore_viewport (&saved);
++}
+--- a/grub-core/kern/efi/sb.c
++++ b/grub-core/kern/efi/sb.c
+@@ -213,7 +213,26 @@
+       return GRUB_ERR_NONE;
+     }
+ 
+-  return grub_error (GRUB_ERR_ACCESS_DENIED, N_("shim protocols not found"));
++  /* A directly firmware-trusted GRUB has no shim protocol. Keep the same
++     verifier policy, but delegate PE image authentication to UEFI LoadImage.
++     Never disable verification: rejected/unsigned images fail closed. */
++  if (last_verified_image_handle != NULL)
++    {
++      grub_efi_unload_image (last_verified_image_handle);
++      last_verified_image_handle = NULL;
++    }
++  image_handle = NULL;
++  if (grub_efi_load_image (false, grub_efi_image_handle, NULL, buf, size,
++                           &image_handle) != GRUB_EFI_SUCCESS)
++    {
++      if (image_handle != NULL)
++        grub_efi_unload_image (image_handle);
++      return grub_error (GRUB_ERR_BAD_SIGNATURE,
++                         N_("image rejected by firmware Secure Boot"));
++    }
++  /* The Linux/chain loaders consume this verified handle without reloading. */
++  last_verified_image_handle = image_handle;
++  return GRUB_ERR_NONE;
+ }
+ 
+ struct grub_file_verifier shim_lock_verifier =
