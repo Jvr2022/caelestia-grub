@@ -4,6 +4,7 @@ Uses only project demo disks and serial markers, never host boot partitions.
 """
 
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -12,7 +13,7 @@ import unittest
 from pathlib import Path
 
 from PIL import Image
-from vm import QMP
+from vm import LUKS_PASSWORD, QMP
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
     "Set CAELESTIA_VM_TESTS=1 for QEMU integration",
 )
 class GrubVMTest(unittest.TestCase):
-    def start(self, *options):
+    def start(self, *options, unlock_password=LUKS_PASSWORD, wait_for_menu=True):
         (ROOT / "build/captures").mkdir(parents=True, exist_ok=True)
         subprocess.run(
             [sys.executable, str(ROOT / "tests/vm.py"), "fixture", *options],
@@ -54,6 +55,18 @@ class GrubVMTest(unittest.TestCase):
                 self.fail("QMP did not start")
             time.sleep(0.1)
         self.q = QMP(self.qmp_path)
+        if "--encrypted-boot" in options:
+            volumes = json.loads((ROOT / "build/vm/luks.json").read_text())["uuids"]
+            for volume in volumes:
+                deadline = time.monotonic() + 30
+                while f"({volume})" not in self.serial():
+                    if time.monotonic() > deadline:
+                        self.fail(f"Missing LUKS prompt: {self.serial()[-1500:]}")
+                    time.sleep(0.1)
+                self.initial_luks_prompts = self.serial().count("Enter passphrase")
+                self.q.type(unlock_password + "\n")
+        if not wait_for_menu:
+            return
         # Wait for real theme pixels, rather than assuming a firmware boot time.
         deadline = time.monotonic() + 40
         while time.monotonic() < deadline:
@@ -186,6 +199,89 @@ class GrubVMTest(unittest.TestCase):
         self.key("right")
         self.assert_center((255, 207, 181))
         self.boot_marker("ubuntu")
+
+    def test_luks_boot_filesystem_unlocks_before_menu(self):
+        for profile in ("luks1", "luks2-pbkdf2", "luks2-argon2i", "luks2-argon2id"):
+            with self.subTest(profile=profile):
+                try:
+                    self.start("--encrypted-boot", profile, "--reduced-motion")
+                    self.assertIn("Boot volume unlocked.", self.serial())
+                    self.assert_center((208, 188, 255))
+                    self.boot_marker("arch")
+                finally:
+                    self.stop()
+
+    def test_luks_wrong_password_does_not_read_menu(self):
+        self.start(
+            "--encrypted-boot",
+            "luks2-argon2id",
+            "--reduced-motion",
+            unlock_password="wrong-password",
+            wait_for_menu=False,
+        )
+        # GRUB allows three attempts. Exhaust them before checking the fail path.
+        for attempt in range(2):
+            expected = self.initial_luks_prompts * (attempt + 2)
+            deadline = time.monotonic() + 10
+            while self.serial().count("Enter passphrase") < expected:
+                if time.monotonic() > deadline:
+                    self.fail("Missing passphrase retry")
+                time.sleep(0.1)
+            self.q.type("wrong-password\n")
+        deadline = time.monotonic() + 10
+        while "Cannot unlock boot storage" not in self.serial():
+            if time.monotonic() > deadline:
+                self.fail(f"Missing unlock failure: {self.serial()[-1500:]}")
+            time.sleep(0.1)
+        self.assertNotIn("Boot volume unlocked.", self.serial())
+        self.assertNotIn("CAELESTIA_BOOT:", self.serial())
+
+    def test_secure_boot_luks2_argon2id(self):
+        self.start(
+            "--encrypted-boot", "luks2-argon2id", "--secure-boot", "--reduced-motion"
+        )
+        self.assertIn("Boot volume unlocked.", self.serial())
+        self.assertIn("CAELESTIA_SECUREBOOT:enforced", self.serial())
+        self.key("home")
+        for _ in range(3):
+            self.key("right", 0.05)
+        self.key("ret", 0.1)
+        deadline = time.monotonic() + 10
+        while "CAELESTIA_TRUSTED_CHILD" not in self.serial():
+            if time.monotonic() > deadline:
+                self.fail(
+                    f"Signed child did not boot from LUKS: {self.serial()[-1500:]}"
+                )
+            time.sleep(0.1)
+
+    def test_luks_lvm_and_4096_byte_sectors(self):
+        for layout, sector_size in (
+            ("lvm-on-luks", "512"),
+            ("luks-on-lvm", "512"),
+            ("direct", "4096"),
+            ("nested-luks", "512"),
+        ):
+            with self.subTest(layout=layout, sector_size=sector_size):
+                try:
+                    self.start(
+                        "--encrypted-boot",
+                        "luks2-argon2id",
+                        "--storage-layout",
+                        layout,
+                        "--sector-size",
+                        sector_size,
+                        "--reduced-motion",
+                    )
+                    self.assertIn("Boot volume unlocked.", self.serial())
+                    self.boot_marker("arch")
+                finally:
+                    self.stop()
+
+    def test_luks_root_disk_does_not_require_early_unlock(self):
+        self.start("--encrypted-root", "luks2-argon2id", "--reduced-motion")
+        self.assertNotIn("Enter passphrase", self.serial())
+        self.assertNotIn("Boot volume unlocked.", self.serial())
+        self.boot_marker("arch")
 
     def test_timeout_is_cancelled_by_navigation(self):
         self.start("--timeout", "4")

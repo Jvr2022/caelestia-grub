@@ -19,9 +19,57 @@ sign_key=
 sign_cert=
 resolution=
 resolution_override=0
+unlock_uuids=()
+boot_fs=
+abstractions=
+
+add_unlock() {
+  local uuid=${1//-/} existing
+  [[ $uuid =~ ^[[:xdigit:]]{32}$ ]] || die 'Invalid LUKS UUID'
+  uuid=${uuid,,}
+  for existing in "${unlock_uuids[@]}"; do [[ $existing != "$uuid" ]] || return 0; done
+  unlock_uuids+=("$uuid")
+}
 
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 root() { if (( EUID == 0 )); then "$@"; else sudo -- "$@"; fi; }
+
+validate_luks_header() {
+  local device=$1 luks_version metadata
+  root cryptsetup isLuks "$device" || die "Cannot read a LUKS header on $device; detached headers and plain dm-crypt boot storage are not supported"
+  luks_version=$(root od --endian=big -An -tu2 -j6 -N2 "$device")
+  case ${luks_version//[[:space:]]/} in
+    1) ;;
+    2)
+      metadata=$(root cryptsetup luksDump --dump-json-metadata "$device")
+      jq -e '(.segments | length) == 1 and
+        all(.segments[]; .type == "crypt" and .integrity == null and ((.flags // []) | length) == 0) and
+        ((.config.requirements.mandatory // []) | length) == 0 and
+        any(.keyslots[]; .type == "luks2" and (.kdf.type == "pbkdf2" or .kdf.type == "argon2i" or .kdf.type == "argon2id"))' \
+        <<< "$metadata" >/dev/null || die 'Unsupported encrypted boot layout: integrity, hardware encryption, active reencryption or unsupported keyslots'
+      ;;
+    *) die 'Unsupported LUKS header version' ;;
+  esac
+}
+
+validate_boot_mappings() {
+  local boot_devices boot_device mappings device resolved slave checked=0
+  local -a slaves
+  for tool in cryptsetup jq od; do command -v "$tool" >/dev/null || die "Encrypted boot storage requires $tool"; done
+  boot_devices=$(root grub-probe --target=device "$config")
+  while IFS= read -r boot_device; do
+    mappings=$(root lsblk --inverse --json --paths --output PATH,TYPE "$boot_device")
+    while IFS= read -r device; do
+      resolved=$(readlink -f -- "$device")
+      slaves=(/sys/class/block/"${resolved##*/}"/slaves/*)
+      [[ ${#slaves[@]} == 1 && -e ${slaves[0]} ]] || die "Cannot determine the backing device of $device"
+      slave=${slaves[0]##*/}
+      validate_luks_header "/dev/$slave"
+      checked=$((checked + 1))
+    done < <(jq -r '.. | objects | select(.type? == "crypt") | .path' <<< "$mappings")
+  done <<< "$boot_devices"
+  (( checked > 0 )) || die 'Could not validate the encrypted boot mappings; nothing was installed'
+}
 usage() {
   cat <<'EOF'
 Usage: ./install.sh [options]
@@ -33,6 +81,8 @@ Default: build and install the carousel, then create a Caelestia UEFI boot entry
   --config FILE    Existing grub.cfg (otherwise detected)
   --resolution WxH Preferred firmware resolution (otherwise detected; auto allowed)
   --no-nvram       Install files without creating a firmware boot entry
+  --unlock UUID    Unlock a LUKS volume before reading grub.cfg (repeatable;
+                   boot volumes are detected automatically when installing)
   --sign-key FILE  Test signing key (only with --stage)
   --sign-cert FILE Test signing certificate (only with --stage)
   --help           Show this help
@@ -49,6 +99,7 @@ while (( $# )); do
     --config) [[ $# -ge 2 ]] || die '--config requires a file'; config=$2; shift 2 ;;
     --resolution) [[ $# -ge 2 ]] || die '--resolution requires WIDTHxHEIGHT or auto'; resolution=$2; resolution_override=1; shift 2 ;;
     --no-nvram) nvram=0; shift ;;
+    --unlock) [[ $# -ge 2 ]] || die '--unlock requires a LUKS UUID'; add_unlock "$2"; shift 2 ;;
     --sign-key) [[ $# -ge 2 ]] || die '--sign-key requires a file'; sign_key=$2; shift 2 ;;
     --sign-cert) [[ $# -ge 2 ]] || die '--sign-cert requires a file'; sign_cert=$2; shift 2 ;;
     --help|-h) usage; exit 0 ;;
@@ -104,6 +155,21 @@ if [[ $mode == install ]]; then
     printf 'Secure Boot enabled: using the existing enrolled sbctl key.\n'
   fi
   boot_uuid=$(root grub-probe --target=fs_uuid "$config")
+  boot_fs=$(root grub-probe --target=fs "$config")
+  [[ $boot_fs =~ ^[a-zA-Z0-9_]+$ ]] || die 'Unsupported GRUB filesystem module name'
+  # Probe only the filesystem holding grub.cfg, not every encrypted disk.
+  # GRUB traverses backing LVM/RAID members in dependency order.
+  abstractions=$(root grub-probe --target=abstraction "$config")
+  crypto_probe=$(root grub-probe --target=cryptodisk_uuid "$config")
+  read -r -a detected_uuids <<< "${crypto_probe//$'\n'/ }"
+  manual_uuids=("${unlock_uuids[@]}")
+  unlock_uuids=()
+  for uuid in "${detected_uuids[@]}"; do add_unlock "$uuid"; done
+  for uuid in "${manual_uuids[@]}"; do add_unlock "$uuid"; done
+  if [[ " $abstractions " == *' cryptodisk '* && ${#unlock_uuids[@]} == 0 ]]; then
+    die 'Encrypted boot filesystem detected, but GRUB could not determine its LUKS UUID'
+  fi
+  if [[ " $abstractions " == *' cryptodisk '* ]]; then validate_boot_mappings; fi
   config_path=$(root grub-mkrelpath "$config")
   prefix_path="${config_path%/*}/caelestia"
   [[ $boot_uuid =~ ^[a-zA-Z0-9-]+$ ]] || die 'Unsupported boot filesystem UUID'
@@ -189,15 +255,39 @@ cp -a -- "$project/theme" "$payload/theme"
 cp -- "$build_dir/grub-core/"*.mod "$build_dir/grub-core/"*.lst "$payload/x86_64-efi/"
 printf 'Caelestia GRUB %s\n' "$version" > "$payload/.caelestia-managed"
 
+# Unlock boot storage before searching for the filesystem or reading its menu.
+# All unlock code and algorithms are preloaded into the signed EFI image.
+# UUIDs are public identifiers. No passwords, key files or volume keys are embedded.
+printf '' > "$work/loader.cfg"
+if [[ $mode == stage && ${#unlock_uuids[@]} -gt 0 ]]; then
+  printf 'serial --unit=0 --speed=115200\nterminal_output console serial\n' >> "$work/loader.cfg"
+fi
+for uuid in "${unlock_uuids[@]}"; do
+  cat >> "$work/loader.cfg" <<EOF
+if cryptomount -u $uuid; then
+  echo 'Boot volume unlocked.'
+else
+  echo 'Cannot unlock boot storage. Returning to firmware.'
+  sleep --interruptible 5
+  exit
+fi
+EOF
+done
+
 # Source the distro-generated menu, then apply the carousel before GRUB shows it.
 # A private prefix keeps all dynamically loaded modules from this matching build.
 if [[ $mode == stage ]]; then
-  printf 'search --file --set=caelestia_boot /caelestia-root\n' > "$work/loader.cfg"
+  printf 'if search --file --set=caelestia_boot /caelestia-root; then\n' >> "$work/loader.cfg"
 else
-  printf 'search --fs-uuid --set=caelestia_boot %s\n' "$boot_uuid" > "$work/loader.cfg"
+  printf 'if search --fs-uuid --set=caelestia_boot %s; then\n' "$boot_uuid" >> "$work/loader.cfg"
 fi
 cat >> "$work/loader.cfg" <<EOF
 set root=\$caelestia_boot
+else
+  echo 'Boot filesystem not found. Returning to firmware.'
+  sleep --interruptible 5
+  exit
+fi
 set prefix=(\$caelestia_boot)$prefix_path
 export prefix
 export caelestia_boot
@@ -241,6 +331,21 @@ EOF
 # refuses arbitrary external .mod files; embedding files in a memdisk alone
 # does not make them preloaded, authenticated modules.
 modules='part_gpt part_msdos fat btrfs ext2 xfs ntfs iso9660 udf search search_fs_uuid search_fs_file search_label configfile normal linux chain boot loadenv test regexp echo sleep serial terminal gettext gzio xzio lzopio zstd reboot halt keystatus probe all_video gfxterm gfxmenu png jpeg font bitmap bitmap_scale bli'
+modules+=' minicmd cryptodisk luks luks2 pbkdf2 argon2 lvm diskfilter mdraid09 mdraid1x'
+if [[ -n $boot_fs ]]; then
+  [[ -f $build_dir/grub-core/$boot_fs.mod ]] || die "This GRUB build cannot read the boot filesystem: $boot_fs"
+  modules+=" $boot_fs"
+fi
+for abstraction in $abstractions; do
+  [[ $abstraction =~ ^[a-zA-Z0-9_]+$ && -f $build_dir/grub-core/$abstraction.mod ]] || die "Unsupported boot storage abstraction: $abstraction"
+  modules+=" $abstraction"
+done
+# Include every cipher/hash shipped by this pinned GRUB. This covers existing
+# LUKS algorithms without loading unauthenticated modules from encrypted storage.
+for algorithm in "$build_dir/grub-core/"gcry_*.mod; do
+  algorithm=${algorithm##*/}
+  modules+=" ${algorithm%.mod}"
+done
 embedded_fonts=()
 for font in "$project/theme/"*.pf2; do
   embedded_fonts+=("boot/grub/fonts/${font##*/}=$font")

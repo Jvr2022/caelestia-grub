@@ -9,6 +9,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,10 +73,23 @@ def fixture(args):
     """Exercise the actual installer payload with disposable GRUB menu entries."""
     out = ROOT / "build/vm"
     command = ["bash", str(ROOT / "install.sh"), "--stage", str(out)]
+    luks_uuid = (
+        str(uuid.uuid4()) if args.encrypted_boot or args.encrypted_root else None
+    )
+    inner_uuid = (
+        str(uuid.uuid4())
+        if luks_uuid and args.storage_layout == "nested-luks"
+        else None
+    )
+    if args.encrypted_boot:
+        command += ["--unlock", luks_uuid]
+        if inner_uuid:
+            command += ["--unlock", inner_uuid]
     if args.secure_boot:
         certificate, key = test_key()
         command += ["--sign-key", str(key), "--sign-cert", str(certificate)]
     subprocess.run(command, check=True)
+    (out / "luks.json").unlink(missing_ok=True)
     (out / "EFI/BOOT").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out / "EFI/caelestia/grubx64.efi", out / "EFI/BOOT/BOOTX64.EFI")
     config = f"""set default=1
@@ -113,10 +127,235 @@ menuentry 'UEFI settings' --class firmware { fixture_boot firmware; }
     if args.secure_boot:
         config += secure_entries(out)
     (out / "boot/grub/grub.cfg").write_text(config)
+    if luks_uuid:
+        encrypted_boot(
+            out,
+            args.encrypted_boot or args.encrypted_root,
+            luks_uuid,
+            layout=args.storage_layout,
+            sector_size=args.sector_size,
+            boot_encrypted=bool(args.encrypted_boot),
+            inner_uuid=inner_uuid,
+        )
     # Expose a real EDID preferred mode to OVMF, including nonstandard ratios.
     width, height = map(int, args.native_resolution.split("x"))
     (out / "display.json").write_text(json.dumps({"width": width, "height": height}))
     print(f"VM fixture: {out}")
+
+
+LUKS_PASSWORD = "caelestia-test-only"
+
+
+def lvm_volume(payload):
+    """Wrap a disposable image in a single-PV, linear-LV LVM2 container."""
+    import struct
+
+    def lvm_id(value):
+        return "-".join(
+            value[a:b]
+            for a, b in (
+                (0, 6),
+                (6, 10),
+                (10, 14),
+                (14, 18),
+                (18, 22),
+                (22, 26),
+                (26, 32),
+            )
+        )
+
+    def checksum(data):
+        crc = 0xF597A6CF
+        for byte in data:
+            crc ^= byte
+            for _ in range(8):
+                crc = (crc >> 1) ^ (0xEDB88320 if crc & 1 else 0)
+        return crc
+
+    start, extent = 1024 * 1024, 4 * 1024 * 1024
+    count = (payload.stat().st_size + extent - 1) // extent
+    size = start + count * extent
+    pv, vg, lv = (uuid.uuid4().hex for _ in range(3))
+    metadata = (
+        f'''caelestia {{
+ id = "{lvm_id(vg)}"
+ seqno = 1
+ format = "lvm2"
+ status = ["RESIZEABLE", "READ", "WRITE"]
+ extent_size = 8192
+ max_lv = 0
+ max_pv = 0
+ physical_volumes {{
+  pv0 {{
+   id = "{lvm_id(pv)}"
+   device = "/dev/test-only"
+   status = ["ALLOCATABLE"]
+   dev_size = {size // 512}
+   pe_start = 2048
+   pe_count = {count}
+  }}
+ }}
+ logical_volumes {{
+  boot {{
+   id = "{lvm_id(lv)}"
+   status = ["READ", "WRITE", "VISIBLE"]
+   segment_count = 1
+   segment1 {{
+    start_extent = 0
+    extent_count = {count}
+    type = "striped"
+    stripe_count = 1
+    stripes = ["pv0", 0]
+   }}
+  }}
+ }}
+}}
+'''.encode()
+        + b"\0"
+    )
+    header = bytearray(start)
+    struct.pack_into("<8sQII8s", header, 512, b"LABELONE", 1, 0, 32, b"LVM2 001")
+    struct.pack_into("<32sQ", header, 544, pv.encode(), size)
+    struct.pack_into("<QQQQQQQQ", header, 584, start, 0, 0, 0, 4096, start - 4096, 0, 0)
+    struct.pack_into("<I", header, 528, checksum(header[532:1024]))
+    struct.pack_into(
+        "<I16sIQQ", header, 4096, 0, b" LVM2 x[5A%r0N*>", 1, 4096, start - 4096
+    )
+    struct.pack_into("<QQII", header, 4136, 512, len(metadata), checksum(metadata), 0)
+    struct.pack_into("<I", header, 4096, checksum(header[4100:4608]))
+    header[4608 : 4608 + len(metadata)] = metadata
+    wrapped = payload.with_suffix(".lvm")
+    with wrapped.open("wb") as target, payload.open("rb") as source:
+        target.write(header)
+        shutil.copyfileobj(source, target)
+        target.truncate(size)
+    wrapped.replace(payload)
+
+
+def encrypt_luks(plaintext, image, profile, luks_uuid, sector_size, directory):
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    size = plaintext.stat().st_size
+    if profile == "luks1":
+        sector_size = 512
+    volume_key = os.urandom(64)
+    key_file, password_file = directory / "volume.key", directory / "password"
+    key_file.write_bytes(volume_key)
+    password_file.write_text(LUKS_PASSWORD)
+    key_file.chmod(0o600)
+    password_file.chmod(0o600)
+    with image.open("wb") as f:
+        f.truncate(size + 32 * 1024 * 1024)
+    version, _, pbkdf = profile.partition("-")
+    command = [
+        "cryptsetup",
+        "luksFormat",
+        "--batch-mode",
+        "--type",
+        version,
+        "--uuid",
+        luks_uuid,
+        "--cipher",
+        "aes-xts-plain64",
+        "--key-size",
+        "512",
+        "--volume-key-file",
+        str(key_file),
+        "--key-file",
+        str(password_file),
+    ]
+    if version == "luks2":
+        command += ["--sector-size", str(sector_size), "--pbkdf", pbkdf]
+    command += ["--pbkdf-force-iterations", "1000" if pbkdf in ("", "pbkdf2") else "4"]
+    if pbkdf.startswith("argon2"):
+        command += ["--pbkdf-memory", "32768", "--pbkdf-parallel", "1"]
+    subprocess.run([*command, str(image)], check=True)
+    if version == "luks2":
+        metadata = json.loads(
+            subprocess.check_output(
+                ["cryptsetup", "luksDump", "--dump-json-metadata", str(image)],
+                text=True,
+            )
+        )
+        offset = int(metadata["segments"]["0"]["offset"])
+    else:
+        import struct
+
+        with image.open("rb") as f:
+            f.seek(104)
+            offset = struct.unpack(">I", f.read(4))[0] * 512
+    with plaintext.open("rb") as source, image.open("r+b") as target:
+        target.seek(offset)
+        for sector in range(size // sector_size):
+            encryptor = Cipher(
+                algorithms.AES(volume_key),
+                modes.XTS((sector * (sector_size // 512)).to_bytes(16, "little")),
+            ).encryptor()
+            target.write(
+                encryptor.update(source.read(sector_size)) + encryptor.finalize()
+            )
+    key_file.unlink()
+    password_file.unlink()
+
+
+def encrypted_boot(
+    out,
+    profile,
+    luks_uuid,
+    layout="direct",
+    sector_size=512,
+    boot_encrypted=True,
+    inner_uuid=None,
+):
+    """Real LUKS headers and encrypted ext4, without root or device-mapper.
+
+    cryptsetup creates the keyslot. AES-XTS encrypts the disposable filesystem
+    sector by sector with its random test volume key. GRUB must unlock it using
+    the passphrase. No host devices, credentials or LUKS headers are touched.
+    """
+    directory = ROOT / "build/luks-fixture"
+    if directory.exists():
+        shutil.rmtree(directory)
+    directory.mkdir(mode=0o700)
+    tree = directory / "root"
+    tree.mkdir()
+    shutil.copytree(out / "boot", tree / "boot")
+    shutil.copyfile(out / "caelestia-root", tree / "caelestia-root")
+    # Secure Boot child/kernel probes are referenced relative to $root.
+    for child in out.glob("*.efi"):
+        shutil.copyfile(child, tree / child.name)
+    plaintext = directory / "filesystem.img"
+    image = ROOT / "build/luks-boot.img"
+    size = 64 * 1024 * 1024
+    with plaintext.open("wb") as f:
+        f.truncate(size)
+    subprocess.run(
+        ["mkfs.ext4", "-q", "-F", "-d", str(tree), str(plaintext)], check=True
+    )
+    if layout == "lvm-on-luks":
+        lvm_volume(plaintext)
+        size = plaintext.stat().st_size
+    encrypt_luks(
+        plaintext, image, profile, inner_uuid or luks_uuid, sector_size, directory
+    )
+    if inner_uuid:
+        inner = directory / "inner.img"
+        image.replace(inner)
+        encrypt_luks(inner, image, profile, luks_uuid, sector_size, directory)
+    # No readable copy may satisfy the loader's search on the EFI test disk.
+    if layout == "luks-on-lvm":
+        lvm_volume(image)
+    if boot_encrypted:
+        shutil.rmtree(out / "boot")
+        (out / "caelestia-root").unlink()
+    (out / "luks.json").write_text(
+        json.dumps(
+            {
+                "uuids": [luks_uuid, *([inner_uuid] if inner_uuid else [])],
+                "profile": profile,
+            }
+        )
+    )
 
 
 def test_key(name="db"):
@@ -345,6 +584,11 @@ def run(args):
     ]
     if args.secure_boot:
         command += ["-global", "driver=cfi.pflash01,property=secure,value=on"]
+    if (out / "luks.json").exists():
+        command += [
+            "-drive",
+            f"format=raw,snapshot=on,file={ROOT / 'build/luks-boot.img'}",
+        ]
     if (local / "usr/share/qemu").exists():
         command += ["-L", str(local / "usr/share/qemu")]
     if not args.headless:
@@ -363,12 +607,28 @@ if __name__ == "__main__":
     f.add_argument("--many", action="store_true")
     f.add_argument("--reduced-motion", action="store_true")
     f.add_argument("--secure-boot", action="store_true")
+    f.add_argument(
+        "--encrypted-boot",
+        choices=("luks1", "luks2-pbkdf2", "luks2-argon2i", "luks2-argon2id"),
+    )
+    f.add_argument(
+        "--encrypted-root",
+        choices=("luks1", "luks2-pbkdf2", "luks2-argon2i", "luks2-argon2id"),
+    )
+    f.add_argument(
+        "--storage-layout",
+        choices=("direct", "lvm-on-luks", "luks-on-lvm", "nested-luks"),
+        default="direct",
+    )
+    f.add_argument("--sector-size", type=int, choices=(512, 4096), default=512)
     r = subs.add_parser("run")
     r.add_argument("--headless", action="store_true")
     r.add_argument("--qmp", default=str(ROOT / "build/qmp.sock"))
     r.add_argument("--secure-boot", action="store_true")
     args = p.parse_args()
     if args.command == "fixture":
+        if args.encrypted_boot and args.encrypted_root:
+            p.error("Choose encrypted boot or encrypted root")
         if args.resolution != "auto" and not re.fullmatch(
             r"\d{3,4}x\d{3,4}", args.resolution
         ):
