@@ -437,6 +437,32 @@ class GrubVMTest(unittest.TestCase):
     def test_secure_boot_accepts_enrolled_signer(self):
         self.secure_boot_probe(3, "CAELESTIA_TRUSTED_CHILD")
 
+    def test_efi_chainloader_preserves_source_paths(self):
+        for secure in (False, True):
+            for explicit in (False, True):
+                with self.subTest(secure_boot=secure, explicit_device=explicit):
+                    try:
+                        options = ["--efi-path-probe", "--reduced-motion"]
+                        if secure:
+                            options.append("--secure-boot")
+                        if explicit:
+                            options.append("--explicit-efi-device")
+                        self.start(*options)
+                        self.key("end")
+                        self.key("ret", 0.1)
+                        deadline = time.monotonic() + 10
+                        while "CAELESTIA_EFI_PATH_OK" not in self.serial():
+                            self.assertNotIn(
+                                "CAELESTIA_EFI_PATH_FAILURE", self.serial()
+                            )
+                            if time.monotonic() > deadline:
+                                self.fail(
+                                    f"EFI path probe did not start: {self.serial()[-1500:]}"
+                                )
+                            time.sleep(0.1)
+                    finally:
+                        self.stop()
+
     def test_secure_boot_rejects_unsigned_image(self):
         self.secure_boot_probe(4, "CAELESTIA_UNSIGNED_REJECTED")
 

@@ -13,7 +13,7 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bison flex pkg-config libfreetype6-dev gettext curl patch python3-venv libcairo2 qemu-system-x86 ovmf openssl sbsigntool cryptsetup-bin e2fsprogs jq
+          sudo apt-get install -y build-essential bison flex pkg-config libfreetype6-dev gettext curl patch python3-venv libcairo2 qemu-system-x86 ovmf openssl sbsigntool cryptsetup-bin e2fsprogs jq clang lld
           python3 -m venv .venv
           .venv/bin/pip install -r requirements.txt
       - name: Shell syntax

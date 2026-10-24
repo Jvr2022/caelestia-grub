@@ -90,6 +90,7 @@ def fixture(args):
         command += ["--sign-key", str(key), "--sign-cert", str(certificate)]
     subprocess.run(command, check=True)
     (out / "luks.json").unlink(missing_ok=True)
+    (out / "efi-path-probe").unlink(missing_ok=True)
     (out / "EFI/BOOT").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out / "EFI/caelestia/grubx64.efi", out / "EFI/BOOT/BOOTX64.EFI")
     config = f"""set default=1
@@ -126,6 +127,16 @@ menuentry 'UEFI settings' --class firmware { fixture_boot firmware; }
 """
     if args.secure_boot:
         config += secure_entries(out)
+    if args.efi_path_probe:
+        efi_path_probe(args.secure_boot)
+        (out / "efi-path-probe").touch()
+        config += """menuentry 'Windows Boot Manager path probe' --class windows {
+ search --file --set=windows_esp /EFI/Microsoft/Boot/bootmgfw.efi
+"""
+        if args.explicit_efi_device:
+            config += " chainloader ($windows_esp)/EFI/Microsoft/Boot/bootmgfw.efi\n}\n"
+        else:
+            config += " set root=$windows_esp\n chainloader /EFI/Microsoft/Boot/bootmgfw.efi\n}\n"
     (out / "boot/grub/grub.cfg").write_text(config)
     if luks_uuid:
         encrypted_boot(
@@ -144,6 +155,61 @@ menuentry 'UEFI settings' --class firmware { fixture_boot firmware; }
 
 
 LUKS_PASSWORD = "caelestia-test-only"
+
+
+def efi_path_probe(secure_boot):
+    """A separate ESP and a native UEFI app that opens a sibling file."""
+    directory = ROOT / "build/windows-esp/EFI/Microsoft/Boot"
+    directory.mkdir(parents=True, exist_ok=True)
+    obj = ROOT / "build/efi-path-probe.obj"
+    image = directory / "bootmgfw.efi"
+    subprocess.run(
+        [
+            "clang",
+            "--target=x86_64-pc-windows-msvc",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-mno-red-zone",
+            "-fshort-wchar",
+            "-O1",
+            "-c",
+            str(ROOT / "tests/efi_path_probe.c"),
+            "-o",
+            str(obj),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "lld-link",
+            "/subsystem:efi_application",
+            "/entry:efi_main",
+            "/nodefaultlib",
+            "/dynamicbase",
+            "/fixed:no",
+            f"/out:{image}",
+            str(obj),
+        ],
+        check=True,
+    )
+    if secure_boot:
+        certificate, key = test_key()
+        signed = directory / "signed.efi"
+        subprocess.run(
+            [
+                "sbsign",
+                "--key",
+                str(key),
+                "--cert",
+                str(certificate),
+                "--output",
+                str(signed),
+                str(image),
+            ],
+            check=True,
+        )
+        signed.replace(image)
+    (directory / "BCD").write_text("CAELESTIA_EFI_PATH_OK")
 
 
 def lvm_volume(payload):
@@ -589,6 +655,8 @@ def run(args):
             "-drive",
             f"format=raw,snapshot=on,file={ROOT / 'build/luks-boot.img'}",
         ]
+    if (out / "efi-path-probe").exists():
+        command += ["-drive", f"format=raw,file=fat:rw:{ROOT / 'build/windows-esp'}"]
     if (local / "usr/share/qemu").exists():
         command += ["-L", str(local / "usr/share/qemu")]
     if not args.headless:
@@ -607,6 +675,8 @@ if __name__ == "__main__":
     f.add_argument("--many", action="store_true")
     f.add_argument("--reduced-motion", action="store_true")
     f.add_argument("--secure-boot", action="store_true")
+    f.add_argument("--efi-path-probe", action="store_true")
+    f.add_argument("--explicit-efi-device", action="store_true")
     f.add_argument(
         "--encrypted-boot",
         choices=("luks1", "luks2-pbkdf2", "luks2-argon2i", "luks2-argon2id"),
